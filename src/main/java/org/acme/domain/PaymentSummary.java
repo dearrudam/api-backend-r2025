@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Collection;
+import java.util.stream.Stream;
 
 public record PaymentSummary(Integer totalRequests,
                              @JsonFormat(shape = JsonFormat.Shape.NUMBER)
@@ -15,25 +16,35 @@ public record PaymentSummary(Integer totalRequests,
         return new PaymentSummary(totalRequests, totalAmount.setScale(2, RoundingMode.HALF_DOWN));
     }
 
-    public PaymentSummary increment(Payment payment) {
+    public PaymentSummary add(Payment payment) {
+        if (payment == null) {
+            return this;
+        }
         return new PaymentSummary(
                 totalRequests + 1,
                 totalAmount.add(payment.amount()).setScale(2, RoundingMode.HALF_DOWN)
         );
     }
 
-    public PaymentSummary increment(Collection<Payment> payments) {
-//        return payments
-//                .stream()
-//                .parallel()
-//                .reduce(ZERO, PaymentSummary::increment, PaymentSummary::add);
+    public PaymentSummary addAll(Collection<Payment>payments) {
+        if (payments == null) {
+            return this;
+        }
+        return addAll(payments.stream());
+    }
 
-        return PaymentSummary.of(payments.size(),
-                payments.stream()
-                        .parallel()
-                        .map(Payment::amount)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add)
-                        .setScale(2, RoundingMode.HALF_DOWN));
+    public PaymentSummary addAll(Payment...payments) {
+        if (payments == null || payments.length == 0) {
+            return this;
+        }
+        return addAll(Stream.of(payments));
+    }
+
+    private PaymentSummary addAll(Stream<Payment> payments) {
+        return payments
+                .parallel()
+                .map(PaymentSummary.ZERO::add)
+                .reduce(PaymentSummary.ZERO, PaymentSummary::add, PaymentSummary::add);
     }
 
     public PaymentSummary add(PaymentSummary other) {
