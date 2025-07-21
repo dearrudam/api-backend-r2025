@@ -6,6 +6,7 @@ import org.acme.domain.Payments;
 import org.acme.domain.PaymentsSummary;
 import org.acme.domain.RemotePaymentName;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -20,22 +21,22 @@ public class RedisPayments implements Payments {
     }
 
     @Override
-    public PaymentsSummary getSummary(Predicate<Payment> filter) {
-        return redisExecutor.retrieve(ctx -> getSummary(ctx, filter));
+    public PaymentsSummary getSummary(Instant from, Instant to) {
+        return redisExecutor.retrieve(ctx -> getSummary(ctx, from, to));
     }
 
-    public static PaymentsSummary getSummary(final RedisExecutor.RedisContext ctx, Predicate<Payment> filter) {
+    public static PaymentsSummary getSummary(final RedisExecutor.RedisContext ctx, Instant from, Instant to) {
         Map<RemotePaymentName, PaymentSummary> summary = new HashMap<>();
         ctx.jedis()
                 .hgetAll(HASH)
                 .values()
                 .stream()
                 .map(json -> ctx.decodeFromJSON(json, Payment.class))
-                .filter(filter)
+                .filter(Payment.createdOn(from, to))
                 .forEach(payment -> {
                     summary.put(payment.processedBy(), summary.computeIfAbsent(
                                     payment.processedBy(), k -> PaymentSummary.ZERO)
-                            .increment(payment));
+                            .add(payment));
                 });
 
         return PaymentsSummary.of(summary);
