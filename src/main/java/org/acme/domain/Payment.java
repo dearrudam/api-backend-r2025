@@ -1,6 +1,7 @@
 package org.acme.domain;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.function.Predicate;
 
@@ -15,7 +16,7 @@ public record Payment(String correlationId,
                              Instant createAt) {
         return new Payment(correlationId,
                 processedBy,
-                amount,
+                amount.setScale(2, RoundingMode.HALF_DOWN),
                 createAt
         );
     }

@@ -13,10 +13,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
-import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.summarizingDouble;
 
 @ApplicationScoped
 public class InMemoryPayments implements Payments {
@@ -25,21 +24,18 @@ public class InMemoryPayments implements Payments {
 
     @Override
     public PaymentsSummary getSummary(Instant from, Instant to) {
-        return ofNullable(Payment.createdOn(from, to))
-                .map(predicate -> {
-                    final Map<RemotePaymentName, PaymentSummary> summaryMap = new HashMap<>();
-                    var paymentsByProcessedBy = currentPayments()
-                            .stream()
-                            .parallel()
-                            .filter(predicate)
-                            .collect(Collectors.groupingBy(p -> p.processedBy()));
-                    paymentsByProcessedBy.forEach((name, payments1) -> {
-                        var summary = summaryMap.getOrDefault(name, PaymentSummary.ZERO).addAll(payments1);
-                        summaryMap.put(name, summary);
-                    });
-                    return PaymentsSummary.of(summaryMap);
-                })
-                .orElseGet(() -> PaymentsSummary.of(Map.of()));
+        final Map<RemotePaymentName, PaymentSummary> summaryMap = new HashMap<>();
+        var paymentsByProcessedBy = currentPayments()
+                .stream()
+                .parallel()
+                .filter(Payment.createdOn(from, to))
+                .collect(groupingBy(Payment::processedBy, summarizingDouble(p -> p.amount().doubleValue())));
+        paymentsByProcessedBy.forEach((name, statistics) -> {
+            var summary = summaryMap.getOrDefault(name, PaymentSummary.ZERO)
+                    .add(PaymentSummary.of(statistics::getCount, statistics::getSum));
+            summaryMap.put(name, summary);
+        });
+        return PaymentsSummary.of(summaryMap);
     }
 
     private List<Payment> currentPayments() {
@@ -48,6 +44,8 @@ public class InMemoryPayments implements Payments {
 
     @Override
     public void add(Payment payment) {
+        if (payment == null)
+            return;
         this.payments.offer(payment);
     }
 

@@ -9,7 +9,9 @@ import org.acme.domain.RemotePaymentName;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Predicate;
+
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.summarizingDouble;
 
 public class RedisPayments implements Payments {
 
@@ -26,24 +28,29 @@ public class RedisPayments implements Payments {
     }
 
     public static PaymentsSummary getSummary(final RedisExecutor.RedisContext ctx, Instant from, Instant to) {
-        Map<RemotePaymentName, PaymentSummary> summary = new HashMap<>();
-        ctx.jedis()
+
+        final Map<RemotePaymentName, PaymentSummary> summaryMap = new HashMap<>();
+
+        var paymentsByProcessedBy = ctx.jedis()
                 .hgetAll(HASH)
                 .values()
                 .stream()
+                .parallel()
                 .map(json -> ctx.decodeFromJSON(json, Payment.class))
                 .filter(Payment.createdOn(from, to))
-                .forEach(payment -> {
-                    summary.put(payment.processedBy(), summary.computeIfAbsent(
-                                    payment.processedBy(), k -> PaymentSummary.ZERO)
-                            .add(payment));
-                });
-
-        return PaymentsSummary.of(summary);
+                .collect(groupingBy(Payment::processedBy, summarizingDouble(p -> p.amount().doubleValue())));
+        paymentsByProcessedBy.forEach((name, statistics) -> {
+            var summary = summaryMap.getOrDefault(name, PaymentSummary.ZERO)
+                    .add(PaymentSummary.of(statistics::getCount, statistics::getSum));
+            summaryMap.put(name, summary);
+        });
+        return PaymentsSummary.of(summaryMap);
     }
 
     @Override
     public void add(Payment payment) {
+        if (payment == null)
+            return;
         redisExecutor.execute(ctx -> add(ctx, payment));
     }
 

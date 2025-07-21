@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.runtime.Startup;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import redis.clients.jedis.UnifiedJedis;
@@ -15,6 +17,8 @@ import java.util.function.Supplier;
 
 import static java.util.Optional.ofNullable;
 
+@Startup
+@ApplicationScoped
 public class RedisExecutor {
 
     private final Supplier<UnifiedJedis> unifiedJedisSupplier;
