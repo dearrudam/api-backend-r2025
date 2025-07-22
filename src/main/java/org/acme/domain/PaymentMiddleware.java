@@ -3,12 +3,12 @@ package org.acme.domain;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Optional.ofNullable;
 
@@ -17,17 +17,23 @@ public class PaymentMiddleware {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PaymentMiddleware.class);
 
+    private final boolean inTestMode;
     private final InternalPaymentsManagement internalPaymentsManagement;
 
     @Inject
     public PaymentMiddleware(
+            @ConfigProperty(name = "payments.test-mode", defaultValue = "false")
+            boolean inTestMode,
             @RestClient
             InternalPaymentsManagement internalPaymentsManagement) {
+        this.inTestMode = inTestMode;
         this.internalPaymentsManagement = internalPaymentsManagement;
     }
 
     @Startup
     public void start() {
+        if(inTestMode)
+            return;
         Thread.startVirtualThread(()-> {
             while (true) {
                 try {
@@ -48,6 +54,8 @@ public class PaymentMiddleware {
     }
 
     public void purgePayments() {
+        if(inTestMode)
+            return;
         try {
             internalPaymentsManagement.purgeInternalPayments();
         } catch (Exception e) {
@@ -56,6 +64,8 @@ public class PaymentMiddleware {
     }
 
     public PaymentsSummary getSummary(Instant from, Instant to) {
+        if(inTestMode)
+            return PaymentsSummary.ZERO;
         try {
             return internalPaymentsManagement.getSummary(
                     ofNullable(from)

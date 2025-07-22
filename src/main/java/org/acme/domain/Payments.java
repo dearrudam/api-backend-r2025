@@ -11,4 +11,11 @@ public interface Payments {
 
     PaymentsSummary getSummary(Instant from, Instant to);
 
+    TransactionOperations newPaymentTransaction();
+
+    interface TransactionOperations {
+        void prepare(Payment payment);
+        void commit(Payment payment);
+        void rollback(Payment payment, Throwable throwable);
+    }
 }

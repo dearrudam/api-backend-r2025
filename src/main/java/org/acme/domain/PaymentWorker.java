@@ -25,7 +25,7 @@ public class PaymentWorker {
                          PaymentProcessor paymentProcessor,
                          @ConfigProperty(name = "worker.queue-buffer", defaultValue = "10000")
                          int queueBuffer,
-                         @ConfigProperty(name = "worker.size", defaultValue = "10")
+                         @ConfigProperty(name = "worker.size", defaultValue = "2")
                          int workers
     ) {
         this.payments = payments;
@@ -46,7 +46,11 @@ public class PaymentWorker {
     private void consumeQueue() {
         while (true) {
             NewPaymentRequest paymentRequest = takeNewPaymentRequest();
-            processPayment(paymentRequest);
+            try {
+                processPayment(paymentRequest);
+            } catch (Exception e) {
+                // I don't want to stop the worker thread if an exception occurs
+            }
         }
     }
 
@@ -59,8 +63,8 @@ public class PaymentWorker {
     }
 
     private void processPayment(NewPaymentRequest paymentRequest) {
-        paymentProcessor.sendPayment(paymentRequest)
-                .ifPresentOrElse(payments::add, () -> this.accept(paymentRequest));
+        Payments.TransactionOperations transaction = payments.newPaymentTransaction();
+        paymentProcessor.sendPayment(paymentRequest, transaction::prepare, transaction::commit, transaction::rollback, this::accept);
     }
 
     public boolean accept(NewPaymentRequest paymentRequest) {

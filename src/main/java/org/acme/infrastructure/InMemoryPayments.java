@@ -17,7 +17,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.summarizingDouble;
 
-@ApplicationScoped
 public class InMemoryPayments implements Payments {
 
     private final ConcurrentLinkedQueue<Payment> payments = new ConcurrentLinkedQueue<>();
@@ -36,6 +35,33 @@ public class InMemoryPayments implements Payments {
             summaryMap.put(name, summary);
         });
         return PaymentsSummary.of(summaryMap);
+    }
+
+    @Override
+    public TransactionOperations newPaymentTransaction() {
+        return new ImMemoryTransactionOperations();
+    }
+
+    class ImMemoryTransactionOperations implements TransactionOperations {
+
+        private Payment payment;
+
+        @Override
+        public void prepare(Payment payment) {
+            this.payment = payment;
+        }
+
+        @Override
+        public void commit(Payment payment) {
+            if (payment != null) {
+                InMemoryPayments.this.add(payment);
+            }
+        }
+
+        @Override
+        public void rollback(Payment payment, Throwable throwable) {
+            // No action needed for in-memory storage
+        }
     }
 
     private List<Payment> currentPayments() {
