@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="in-memory-quarkus-api2" type="QuarkusRunConfigurationType" factoryName="Quarkus">
+  <configuration default="false" name="in-memory-quarkus-dev" type="QuarkusRunConfigurationType" factoryName="Quarkus">
     <module name="api-backend-r2025" />
     <QsMavenRunConfiguration>
       <MavenSettings>
@@ -31,7 +31,7 @@
       </MavenSettings>
       <targetMavenLocalRepo />
       <emulateTerminal>true</emulateTerminal>
-      <profile>api2</profile>
+      <profile>dev</profile>
     </QsMavenRunConfiguration>
     <method v="2">
       <option name="Make" enabled="true" />
