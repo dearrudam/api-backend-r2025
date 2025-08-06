@@ -11,7 +11,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.time.Instant;
-import java.util.Map;
 
 @Path("/")
 @RunOnVirtualThread
@@ -20,41 +19,38 @@ import java.util.Map;
 public class PaymentsResource {
 
 
-    private final PaymentService paymentService;
-    private final PaymentsRepository paymentsRepository;
-    private final PaymentProcessorQueue paymentProcessorQueue;
+    private final PaymentRepository paymentRepository;
+    private final PaymentProcessor paymentProcessor;
 
     public PaymentsResource(
-            PaymentService paymentService,
-            PaymentsRepository paymentsRepository,
-            PaymentProcessorQueue paymentProcessorQueue) {
-        this.paymentService = paymentService;
-        this.paymentsRepository = paymentsRepository;
-        this.paymentProcessorQueue = paymentProcessorQueue;
+            PaymentRepository paymentRepository,
+            PaymentProcessor paymentProcessor) {
+        this.paymentRepository = paymentRepository;
+        this.paymentProcessor = paymentProcessor;
     }
 
     @POST
     @RunOnVirtualThread
     @Path("/payments")
     public Response processPayment(PaymentRequest paymentRequest) {
-        paymentProcessorQueue.acceptPayment(paymentRequest);
+        paymentProcessor.acceptPayment(paymentRequest);
         return Response.status(Response.Status.ACCEPTED).build();
     }
 
     @GET
     @RunOnVirtualThread
     @Path("/payments-summary")
-    public Map<String, Map<String, Object>> getPaymentsSummary(
+    public Response getPaymentsSummary(
             @QueryParam("from") Instant from,
             @QueryParam("to") Instant to) {
-        return paymentService.getSummary(from, to);
+        return Response.ok(paymentRepository.summary(from, to)).build();
     }
 
     @POST
     @RunOnVirtualThread
     @Path("/purge-payments")
     public void purge() {
-        paymentsRepository.deleteAll();
+        paymentRepository.deleteAll();
     }
 
 }

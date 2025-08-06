@@ -1,21 +1,16 @@
 package org.acme;
 
-import jakarta.nosql.Column;
-import jakarta.nosql.Entity;
-import jakarta.nosql.Id;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 
-@Entity
+
+@RegisterForReflection
 public record Payment(
-        @Id
         String correlationId,
-        @Column
         BigDecimal amount,
-        @Column
         PaymentType type,
-        @Column
         Instant requestedAt) {
 
     public static Payment create(PaymentRequest paymentRequest) {

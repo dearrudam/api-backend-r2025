@@ -11,16 +11,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 
 @ApplicationScoped
-public class PaymentProcessorQueue {
+public class PaymentProcessor {
 
-    private final LinkedBlockingQueue<PaymentRequest> queue = new LinkedBlockingQueue<>();
+    private final LinkedBlockingQueue<PaymentRequest> queue;
     private final ExecutorService executorService;
-    private final Integer queueSize;
     private final Integer workers;
     private final RemotePaymentProcessor remotePaymentProcessor;
     private final Semaphore semaphore;
 
-    public PaymentProcessorQueue(
+    public PaymentProcessor(
             @VirtualThreads
             ExecutorService executorService,
             @ConfigProperty(name = "queue.size")
@@ -29,8 +28,8 @@ public class PaymentProcessorQueue {
             Optional<Integer> workers,
             RemotePaymentProcessor remotePaymentProcessor) {
         this.executorService = executorService;
-        this.queueSize = queueSize.orElse(1000);
         this.workers = workers.orElse(10);
+        this.queue = new LinkedBlockingQueue<>(queueSize.orElse(Integer.MAX_VALUE));
         this.remotePaymentProcessor = remotePaymentProcessor;
         this.semaphore = new Semaphore(this.workers);
     }
@@ -55,7 +54,14 @@ public class PaymentProcessorQueue {
                     semaphore.acquire();
                     remotePaymentProcessor.process(paymentRequest);
                 } catch (RuntimeException e) {
-                    // ignore the exception, it will be retried later
+                    System.out.printf("%s error processing payment request: %s%n", "💥", e.getMessage());
+                    if (e instanceof NullPointerException) {
+                        Thread.currentThread().interrupt(); // Restore interrupted status
+                        break; // Exit the loop if interrupted
+                    }
+                    if (e instanceof UnsupportedOperationException) {
+                        continue; // Skip processing if unsupported operation
+                    }
                     queue.offer(paymentRequest);
                 } finally {
                     semaphore.release();

@@ -1,7 +1,10 @@
 package org.acme;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
 import java.math.BigDecimal;
 
+@RegisterForReflection
 public record Summary(Long totalRequests, BigDecimal totalAmount) {
 
     public Summary() {
@@ -11,6 +14,14 @@ public record Summary(Long totalRequests, BigDecimal totalAmount) {
     public Summary(Long totalRequests, BigDecimal totalAmount) {
         this.totalRequests = totalRequests;
         this.totalAmount = totalAmount;
+    }
+
+    public static Summary of(Payment payment) {
+        return new Summary(1L, payment.amount());
+    }
+
+    public static Summary empty() {
+        return new Summary();
     }
 
     public Summary add(Summary other) {
