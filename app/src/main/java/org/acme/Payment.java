@@ -5,7 +5,6 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-
 @RegisterForReflection
 public record Payment(
         String correlationId,
