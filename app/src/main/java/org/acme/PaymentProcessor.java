@@ -1,75 +1,74 @@
 package org.acme;
 
+import io.quarkus.redis.datasource.ReactiveRedisDataSource;
+import io.quarkus.redis.datasource.list.ReactiveListCommands;
 import io.quarkus.runtime.Startup;
-import io.quarkus.virtual.threads.VirtualThreads;
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.ForkJoinPool;
 
 @ApplicationScoped
 public class PaymentProcessor {
 
-    private final LinkedBlockingQueue<PaymentRequest> queue;
-    private final ExecutorService executorService;
-    private final Integer workers;
+    private final ReactiveListCommands<String, PaymentRequest> list;
     private final RemotePaymentProcessor remotePaymentProcessor;
-    private final Semaphore semaphore;
+    private final int workers;
 
     public PaymentProcessor(
-            @VirtualThreads
-            ExecutorService executorService,
-            @ConfigProperty(name = "queue.size")
-            Optional<Integer> queueSize,
+            ReactiveRedisDataSource redis,
+            RemotePaymentProcessor remotePaymentProcessor,
             @ConfigProperty(name = "workers")
-            Optional<Integer> workers,
-            RemotePaymentProcessor remotePaymentProcessor) {
-        this.executorService = executorService;
-        this.workers = workers.orElse(10);
-        this.queue = new LinkedBlockingQueue<>(queueSize.orElse(Integer.MAX_VALUE));
+            Optional<Integer> workers) {
+        ;
+        this.list = redis.list(PaymentRequest.class);
         this.remotePaymentProcessor = remotePaymentProcessor;
-        this.semaphore = new Semaphore(this.workers);
+        this.workers = workers.orElse(10);
     }
 
     @Startup
     public void init() {
-        // Start a thread to process payments from the queue
-        for (int i = 0; i < semaphore.availablePermits(); i++) {
-            executorService.submit(this::processPayment);
-        }
+        for (int i = 0; i < workers; i++)
+            this.listen();
     }
 
-    public boolean acceptPayment(PaymentRequest paymentRequest) {
-        return queue.offer(paymentRequest);
+    public void listen() {
+        list.lpop("payment:request")
+                .onItem().transformToUni(res -> {
+                    if (res == null) {
+                        return Uni.createFrom().voidItem();
+                    }
+                    return process(res);
+                })
+                .subscribe()
+                .with(data -> listen(),
+                        failure -> {
+                            System.out.printf("%s unexpected issue happened: %s%n", "💥", failure.getMessage());
+                            listen();
+                        });
     }
 
-    private void processPayment() {
-        while (true) {
-            try {
-                PaymentRequest paymentRequest = queue.take(); // Blocking call
-                try {
-                    semaphore.acquire();
-                    remotePaymentProcessor.process(paymentRequest);
-                } catch (RuntimeException e) {
-                    System.out.printf("%s error processing payment request: %s%n", "💥", e.getMessage());
-                    if (e instanceof NullPointerException) {
-                        Thread.currentThread().interrupt(); // Restore interrupted status
-                        break; // Exit the loop if interrupted
+    private Uni<?> process(PaymentRequest paymentRequest) {
+        if (paymentRequest == null)
+            return Uni.createFrom().voidItem();
+        return remotePaymentProcessor.process(paymentRequest);
+    }
+
+    public Uni<?> acceptPayment(PaymentRequest paymentRequest) {
+        if (paymentRequest == null)
+            return Uni.createFrom().item(false);
+        return list.lpush("payment:request", paymentRequest)
+                .onItem().transform(response -> {
+                    if (response == null || response.toString().isEmpty()) {
+                        System.out.println("Failed to accept payment request, retrying...");
+                        return false; // Retry if failed to accept
                     }
-                    if (e instanceof UnsupportedOperationException) {
-                        continue; // Skip processing if unsupported operation
-                    }
-                    queue.offer(paymentRequest);
-                } finally {
-                    semaphore.release();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // Restore interrupted status
-                break; // Exit the loop if interrupted
-            }
-        }
+                    System.out.println("Payment request accepted successfully.");
+                    return true; // Successfully accepted the payment request
+                })
+                .onFailure().recoverWithItem(false);
     }
 }
