@@ -37,6 +37,7 @@ public interface PaymentsRepository extends NoSQLRepository<Payment, String> {
             payments = summary(from, to);
         }
         Map<String, Summary> collect = payments
+                .parallel()
                 .collect(Collectors.groupingBy(p -> p.type().name().toLowerCase(),
                         Collectors.reducing(
                                 new Summary(),
