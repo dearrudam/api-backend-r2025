@@ -3,6 +3,8 @@ package org.acme;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.search.SearchOperator;
+import io.quarkus.mongodb.AggregateOptions;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.bson.BsonDocument;
@@ -27,14 +29,18 @@ public class PaymentService {
         this.template = template;
     }
 
-    public Payment savePayment(Payment payment) {
-        return template.insert(payment);
+    public Payment saveAsDefaultPayment(Payment payment) {
+        return template.insert(payment.withType(Payment.PaymentType.DEFAULT));
+    }
+
+    public Payment saveAsFallbackPayment(Payment payment) {
+        return template.insert(payment.withType(Payment.PaymentType.FALLBACK));
     }
 
     public Map<String, Map<String, Object>> getSummary(Instant from, Instant to) {
         Bson match = null;
         if (from == null || to == null) {
-            match = new BsonDocument();
+            match = Aggregates.match(new BsonDocument());
         } else {
             if (from.isAfter(to)) {
                 throw new IllegalArgumentException("The 'from' date must be before the 'to' date.");
