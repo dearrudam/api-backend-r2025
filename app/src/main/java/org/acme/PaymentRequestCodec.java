@@ -9,17 +9,17 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Type;
 
 @ApplicationScoped
-public class PaymentCodec implements Codec {
+public class PaymentRequestCodec implements Codec {
 
     private final Jsonb jsonb;
 
-    public PaymentCodec(Jsonb jsonb) {
+    public PaymentRequestCodec(Jsonb jsonb) {
         this.jsonb = jsonb;
     }
 
     @Override
     public boolean canHandle(Type clazz) {
-        return Payment.class.equals(clazz);
+        return PaymentRequest.class.equals(clazz);
     }
 
     @Override
@@ -37,6 +37,6 @@ public class PaymentCodec implements Codec {
         if (item == null || item.length == 0) {
             return null;
         }
-        return jsonb.fromJson(new ByteArrayInputStream(item), Payment.class);
+        return jsonb.fromJson(new ByteArrayInputStream(item), PaymentRequest.class);
     }
 }
