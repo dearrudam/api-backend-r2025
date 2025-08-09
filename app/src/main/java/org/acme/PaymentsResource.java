@@ -2,6 +2,7 @@ package org.acme;
 
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -11,7 +12,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.time.Instant;
-import java.util.Map;
 
 @Path("/")
 @RunOnVirtualThread
@@ -19,35 +19,35 @@ import java.util.Map;
 @Produces(MediaType.APPLICATION_JSON)
 public class PaymentsResource {
 
-
     private final PaymentService paymentService;
     private final PaymentsRepository paymentsRepository;
-    private final PaymentProcessorQueue paymentProcessorQueue;
+    private final PaymentProcessor paymentProcessor;
 
     public PaymentsResource(
             PaymentService paymentService,
             PaymentsRepository paymentsRepository,
-            PaymentProcessorQueue paymentProcessorQueue) {
+            PaymentProcessor paymentProcessor) {
         this.paymentService = paymentService;
         this.paymentsRepository = paymentsRepository;
-        this.paymentProcessorQueue = paymentProcessorQueue;
+        this.paymentProcessor = paymentProcessor;
     }
 
     @POST
     @RunOnVirtualThread
     @Path("/payments")
     public Response processPayment(PaymentRequest paymentRequest) {
-        paymentProcessorQueue.acceptPayment(paymentRequest);
+        paymentProcessor.acceptPayment(paymentRequest);
         return Response.status(Response.Status.ACCEPTED).build();
     }
 
     @GET
     @RunOnVirtualThread
     @Path("/payments-summary")
-    public Map<String, Map<String, Object>> getPaymentsSummary(
+    public Object getPaymentsSummary(
             @QueryParam("from") Instant from,
-            @QueryParam("to") Instant to) {
-        return paymentService.getSummary(from, to);
+            @QueryParam("to") Instant to,
+            @QueryParam("useRepository") @DefaultValue("false") boolean useRepository) {
+        return useRepository ? paymentsRepository.getSummary(from, to) : paymentService.getSummary(from, to);
     }
 
     @POST
