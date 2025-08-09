@@ -1,16 +1,16 @@
 package org.acme.domain;
 
-import io.quarkus.runtime.Startup;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
+import static java.util.Optional.ofNullable;
+
+import java.time.Instant;
+
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static java.util.Optional.ofNullable;
+import io.quarkus.runtime.Startup;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class PaymentMiddleware {

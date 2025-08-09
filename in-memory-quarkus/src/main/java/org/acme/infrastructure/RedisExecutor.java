@@ -1,21 +1,23 @@
 package org.acme.infrastructure;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonMappingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.quarkus.runtime.Startup;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Produces;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import redis.clients.jedis.UnifiedJedis;
+import static java.util.Optional.ofNullable;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static java.util.Optional.ofNullable;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.quarkus.runtime.Startup;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import redis.clients.jedis.UnifiedJedis;
 
 @Startup
 @ApplicationScoped
@@ -23,13 +25,11 @@ public class RedisExecutor {
 
     private final Supplier<UnifiedJedis> unifiedJedisSupplier;
     private final ObjectMapper objectMapper;
-    private final String redisHosts;
 
-    public RedisExecutor(@ConfigProperty(name = "quarkus.redis.hosts", defaultValue = "redis://localhost:6379")
+    public RedisExecutor(@ConfigProperty(name = "redis.hosts", defaultValue = "redis://localhost:6379")
                          String redisHosts,
                          ObjectMapper objectMapper) {
-
-        this.redisHosts = redisHosts;
+                            
         this.unifiedJedisSupplier = () -> new UnifiedJedis(redisHosts);
         this.objectMapper = objectMapper;
     }
