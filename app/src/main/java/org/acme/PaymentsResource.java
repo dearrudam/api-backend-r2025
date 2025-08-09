@@ -1,6 +1,7 @@
 package org.acme;
 
-import io.smallrye.common.annotation.RunOnVirtualThread;
+import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.Uni;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -9,11 +10,11 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.jboss.resteasy.reactive.RestMulti;
 
 import java.time.Instant;
 
 @Path("/")
-@RunOnVirtualThread
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class PaymentsResource {
@@ -30,27 +31,25 @@ public class PaymentsResource {
     }
 
     @POST
-    @RunOnVirtualThread
     @Path("/payments")
-    public Response processPayment(PaymentRequest paymentRequest) {
-        paymentProcessor.acceptPayment(paymentRequest);
-        return Response.status(Response.Status.ACCEPTED).build();
+    public RestMulti<?> processPayment(PaymentRequest paymentRequest) {
+        return RestMulti
+                .fromMultiData(Multi.createFrom().uni(paymentProcessor.acceptPayment(paymentRequest)))
+                .status(Response.Status.ACCEPTED.getStatusCode()).build();
     }
 
     @GET
-    @RunOnVirtualThread
     @Path("/payments-summary")
-    public Response getPaymentsSummary(
+    public Uni<?> getPaymentsSummary(
             @QueryParam("from") Instant from,
             @QueryParam("to") Instant to) {
-        return Response.ok(paymentRepository.summary(from, to)).build();
+        return paymentRepository.summary(from, to);
     }
 
     @POST
-    @RunOnVirtualThread
     @Path("/purge-payments")
-    public void purge() {
-        paymentRepository.deleteAll();
+    public Uni<?> purge() {
+        return paymentRepository.deleteAll();
     }
 
 }
