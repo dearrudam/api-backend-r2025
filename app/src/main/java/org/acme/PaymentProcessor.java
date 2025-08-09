@@ -11,7 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 
 @ApplicationScoped
-public class PaymentProcessorQueue {
+public class PaymentProcessor {
 
     private final LinkedBlockingQueue<PaymentRequest> queue = new LinkedBlockingQueue<>();
     private final ExecutorService executorService;
@@ -20,7 +20,7 @@ public class PaymentProcessorQueue {
     private final RemotePaymentProcessor remotePaymentProcessor;
     private final Semaphore semaphore;
 
-    public PaymentProcessorQueue(
+    public PaymentProcessor(
             @VirtualThreads
             ExecutorService executorService,
             @ConfigProperty(name = "queue.size")
