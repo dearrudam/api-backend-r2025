@@ -13,11 +13,11 @@ services:
       - "9999:9999"
     networks:
       - backend-net
-    deploy:
-      resources:
-        limits:
-          cpus: "0.20"
-          memory: "20MB"
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.20"
+#          memory: "20MB"
 
   #--- BACKEND 1 ---
   backend1: &backend
@@ -26,11 +26,11 @@ services:
     environment:
       QUARKUS_HTTP_PORT: 8080
       QUEUE_SIZE: 10000
-      WORKERS: 5
+      WORKERS: 10
       JNOSQL_DOCUMENT_DATABASE: payments
       QUARKUS_MONGODB_CONNECTION_STRING: mongodb://root:example@mongo:27017/payments?authSource=admin
-      QUARKUS_MONGODB_MAX_POOL_SIZE: 5
-      QUARKUS_MONGODB_MIN_POOL_SIZE: 5
+      QUARKUS_MONGODB_MAX_POOL_SIZE: 10
+      QUARKUS_MONGODB_MIN_POOL_SIZE: 10
       RETRIES_BEFORE_FALLBACK: 25
       DEFAULT_PAYMENT_URL: http://payment-processor-default:8080/payments
       FALLBACK_PAYMENT_URL: http://payment-processor-fallback:8080/payments
@@ -40,11 +40,11 @@ services:
       - backend-net
       - payment-processor
     hostname: backend1
-    deploy:
-      resources:
-        limits:
-          cpus: "0.80"
-          memory: "200MB"
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.80"
+#          memory: "200MB"
 
   #--- BACKEND 2 ---
   backend2:
@@ -66,11 +66,11 @@ services:
     networks:
       - backend-net
     hostname: mongo
-    deploy:
-      resources:
-        limits:
-          cpus: "0.50"
-          memory: "130MB"
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: "0.50"
+#          memory: "130MB"
 
 #--- NETWORKS ---
 networks:
