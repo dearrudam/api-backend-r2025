@@ -1,4 +1,4 @@
-name: In-Memory Quarkus CI
+name: Backend using In-Memory Storage - CI
 
 on:
   push:
