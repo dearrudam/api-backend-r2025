@@ -1,60 +1,77 @@
 package org.acme.domain;
 
-import io.vertx.core.impl.NoStackTraceTimeoutException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.faulttolerance.Fallback;
-import org.eclipse.microprofile.faulttolerance.Retry;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 
 @ApplicationScoped
 public class PaymentProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PaymentProcessor.class);
-    private final DefaultPaymentProcessor defaultPaymentProcessor;
-    private final FallbackPaymentProcessor fallbackPaymentProcessor;
+    private final DefaultRemotePaymentProcessor defaultRemotePaymentProcessor;
+    private final FallbackRemotePaymentProcessor fallbackRemotePaymentProcessor;
+    private final int retries;
+    private final Map<String, AtomicInteger> errorCounter = new ConcurrentHashMap<>();
 
     @Inject
     public PaymentProcessor(
             @RestClient
-            DefaultPaymentProcessor defaultPaymentProcessor,
+            DefaultRemotePaymentProcessor defaultRemotePaymentProcessor,
             @RestClient
-            FallbackPaymentProcessor fallbackPaymentProcessor) {
-        this.defaultPaymentProcessor = defaultPaymentProcessor;
-        this.fallbackPaymentProcessor = fallbackPaymentProcessor;
+            FallbackRemotePaymentProcessor fallbackRemotePaymentProcessor,
+            @ConfigProperty(name = "retries.before.fallback", defaultValue = "16")
+            int retries
+    ) {
+        this.defaultRemotePaymentProcessor = defaultRemotePaymentProcessor;
+        this.fallbackRemotePaymentProcessor = fallbackRemotePaymentProcessor;
+        this.retries = retries;
     }
 
-    @Retry(maxRetries = 16)
-    @Fallback(fallbackMethod = "fallbackSendPayment")
     public Optional<Payment> sendPayment(NewPaymentRequest newPaymentRequest) {
-        RemotePaymentRequest request = newPaymentRequest.toNewPayment();
-        defaultPaymentProcessor.processPayment(request);
-        return Optional.of(RemotePaymentName.DEFAULT.toPayment(request));
+        try {
+            RemotePaymentRequest request = newPaymentRequest.toNewPayment();
+            var response = defaultRemotePaymentProcessor.processPayment(request);
+            return switch (response.getStatus()) {
+                case 200 -> {
+                    errorCounter.remove(newPaymentRequest.correlationId());
+                    yield Optional.of(RemotePaymentName.DEFAULT.toPayment(request));
+                }
+                case 500 -> errorCounter
+                        .computeIfAbsent(newPaymentRequest.correlationId(), k -> new AtomicInteger())
+                        .incrementAndGet() > retries ? fallbackSendPayment(newPaymentRequest) : Optional.empty();
+                default -> Optional.empty();
+            };
+        } catch (RuntimeException e) {
+            errorCounter
+                    .computeIfAbsent(newPaymentRequest.correlationId(), k -> new AtomicInteger())
+                    .incrementAndGet();
+            return Optional.empty();
+        }
     }
 
     public Optional<Payment> fallbackSendPayment(NewPaymentRequest newPaymentRequest) {
         final RemotePaymentRequest request = newPaymentRequest.toNewPayment();
         try {
-            fallbackPaymentProcessor.processPayment(request);
-            return Optional.of(RemotePaymentName.FALLBACK.toPayment(request));
-        } catch (Exception ex) {
-            Throwable throwable = getRootCause(ex);
-            if (throwable instanceof NoStackTraceTimeoutException timeoutException) {
-                LOGGER.warn("ProcessingException occurred while sending payment: {}", timeoutException.getMessage(), timeoutException);
-                return Optional.of(RemotePaymentName.FALLBACK.toPayment(request));
-            } else {
-                LOGGER.error("Unexpected error occurred while sending payment: {}", throwable.getMessage(), throwable);
-                return Optional.empty();
-            }
+            var response = fallbackRemotePaymentProcessor.processPayment(request);
+            return switch (response.getStatus()) {
+                case 200 -> {
+                    errorCounter.remove(newPaymentRequest.correlationId());
+                    yield Optional.of(RemotePaymentName.FALLBACK.toPayment(request));
+                }
+                default -> Optional.empty();
+            };
+        } catch (RuntimeException e) {
+            return Optional.empty();
         }
     }
 
-    private Throwable getRootCause(Throwable throwable) {
-        Throwable cause = throwable.getCause();
-        return (cause != null) && (throwable != cause) ? getRootCause(cause) : throwable;
-    }
 }
