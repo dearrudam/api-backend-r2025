@@ -1,0 +1,64 @@
+services:
+  #--- LOAD BALANCER ---
+  nginx:
+    image: nginx:alpine
+    restart: always
+    container_name: in-memory-quarkus-nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - in-memory-quarkus-01
+      - in-memory-quarkus-02
+    ports:
+      - "9999:9999"
+    networks:
+      - in-memory-quarkus-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.26"
+          memory: "20MB"
+
+  #--- BACKEND 1 ---
+  in-memory-quarkus-01: &in-memory-quarkus
+    build:
+      dockerfile: ./src/main/docker/Dockerfile.native-micro
+    environment:
+      - QUARKUS_HTTP_PORT=8080
+      - DEFAULT_PAYMENT_PROCESSOR_URL=http://payment-processor-default:8080
+      - FALLBACK_PAYMENT_PROCESSOR_URL=http://payment-processor-fallback:8080
+      - INTERNAL_PAYMENTS_MANAGEMENT_URL=http://in-memory-quarkus-02:8080
+      - WORKER_QUEUE_BUFFER=999999999
+      - WORKER_SIZE=15
+      - RETRIES_BEFORE_FALLBACK=10000
+      - PAYMENTS_PARALLEL_STREAM_THRESHOLD=1000000
+    networks:
+      - in-memory-quarkus-net
+      - payment-processor
+    hostname: in-memory-quarkus-01
+    deploy:
+      resources:
+        limits:
+          cpus: "0.62"
+          memory: "165MB"
+
+  #--- BACKEND 2 ---
+  in-memory-quarkus-02:
+    <<: *in-memory-quarkus
+    hostname: in-memory-quarkus-02
+    environment:
+      - QUARKUS_HTTP_PORT=8080
+      - DEFAULT_PAYMENT_PROCESSOR_URL=http://payment-processor-default:8080
+      - FALLBACK_PAYMENT_PROCESSOR_URL=http://payment-processor-fallback:8080
+      - INTERNAL_PAYMENTS_MANAGEMENT_URL=http://in-memory-quarkus-01:8080
+      - WORKER_QUEUE_BUFFER=99999
+      - WORKER_SIZE=15
+      - RETRIES_BEFORE_FALLBACK=10000
+      - PAYMENTS_PARALLEL_STREAM_THRESHOLD=1000000
+
+#--- NETWORKS ---
+networks:
+  in-memory-quarkus-net:
+    driver: bridge
+  payment-processor:
+    external: true

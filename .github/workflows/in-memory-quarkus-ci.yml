@@ -1,0 +1,41 @@
+name: Backend using In-Memory Storage - CI
+
+on:
+  push:
+    paths:
+      - 'in-memory-quarkus/**'
+  pull_request:
+    paths:
+      - 'in-memory-quarkus/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: in-memory-quarkus
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Build e Testes (mvn clean install)
+        run: ./mvnw clean install -B
+
+      - name: Upload de resultados de teste (JUnit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-report-in-memory-quarkus
+          path: in-memory-quarkus/target/surefire-reports/
+
+      - name: Feedback no GitHub
+        if: failure()
+        run: echo "::error ::Falha no build ou nos testes no projeto in-memory."
