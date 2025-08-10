@@ -65,7 +65,7 @@ public class PaymentMiddleware {
                             .map(Object::toString)
                             .orElse(""));
         } catch (Exception e) {
-            LOGGER.warn("Error fetching payment summary: {}", e.getMessage(), e);
+            //LOGGER.warn("Error fetching payment summary: {}", e.getMessage(), e);
             return PaymentsSummary.ZERO;
         }
     }

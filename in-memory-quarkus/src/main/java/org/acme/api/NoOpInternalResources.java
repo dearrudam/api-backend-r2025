@@ -15,7 +15,7 @@ import org.acme.domain.PaymentsSummary;
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 @RunOnVirtualThread
-public class NoOpInternalPaymentsResources {
+public class NoOpInternalResources {
 
     @GET
     @Path("/internal/payments-summary")
@@ -32,7 +32,7 @@ public class NoOpInternalPaymentsResources {
     @Path("/q/health/ready")
     @GET
     public String healthReadyCheck() {
-        return "{}";
+        return "{\"status\":\"UP\", \"checks\":[\"local\"]}";
     }
 
 }

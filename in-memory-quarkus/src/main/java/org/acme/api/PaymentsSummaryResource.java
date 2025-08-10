@@ -13,7 +13,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.acme.domain.PaymentService;
 import org.acme.domain.PaymentsSummary;
-import org.acme.infrastructure.InstantConverter;
 
 import java.time.Instant;
 import java.util.function.BiFunction;
@@ -45,31 +44,19 @@ public class PaymentsSummaryResource {
 
     @GET
     @Path("/payments-summary")
-    public Response get(@QueryParam("from") @DefaultValue("") String fromStr,
-                        @QueryParam("to") @DefaultValue("") String toStr) {
-        return getSummary(fromStr, toStr, paymentService::getSummary);
+    public Response get(@QueryParam("from") Instant from,
+                        @QueryParam("to") Instant to) {
+        return getSummary(from, to, paymentService::getSummary);
     }
 
     @Path("/internal/payments-summary")
     @GET
-    public Response getInternalSummary(@QueryParam("from") @DefaultValue("") String fromStr,
-                                       @QueryParam("to") @DefaultValue("") String toStr) {
-        return getSummary(fromStr, toStr, paymentService::getInternalSummary);
+    public Response getInternalSummary(@QueryParam("from") Instant from,
+                                       @QueryParam("to") Instant to) {
+        return getSummary(from, to, paymentService::getInternalSummary);
     }
 
-    private Response getSummary(String fromStr, String toStr, BiFunction<Instant, Instant, PaymentsSummary> summaryFunction) {
-
-        if ("".equals(fromStr) || "".equals(toStr)) {
-            return Response.ok(summaryFunction.apply(null,null)).build();
-        }
-
-        Instant from = InstantConverter.parse(fromStr);
-        Instant to = InstantConverter.parse(toStr);
-
-        if (from == null || to == null) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("from and to cannot be null.").build();
-        }
-
+    private Response getSummary(Instant from, Instant to, BiFunction<Instant, Instant, PaymentsSummary> summaryFunction) {
         return Response.ok(summaryFunction.apply(from, to)).build();
     }
 
