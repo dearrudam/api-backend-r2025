@@ -6,7 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -71,7 +71,7 @@ public interface PaymentsTests {
 
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(1L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(100.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(100.00));
             assertThat(summary.fallbackPaymentSummary().totalRequests()).isZero();
         }
 
@@ -90,7 +90,7 @@ public interface PaymentsTests {
 
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
             assertThat(summary.fallbackPaymentSummary().totalRequests()).isEqualTo(1L);
-            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(150.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(150.00));
             assertThat(summary.defaultPaymentSummary().totalRequests()).isZero();
         }
 
@@ -111,7 +111,7 @@ public interface PaymentsTests {
 
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(2L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(125.50).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(125.50));
         }
 
         @Test
@@ -147,10 +147,55 @@ public interface PaymentsTests {
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
 
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(1L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(100.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(100.00));
 
             assertThat(summary.fallbackPaymentSummary().totalRequests()).isEqualTo(1L);
-            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(200.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(200.00));
+        }
+
+        @Test
+        @DisplayName("Should handle payments with zero amount")
+        default void shouldHandlePaymentsWithZeroAmount() {
+            var context = testContext();
+            var payments = context.payments();
+            var baseTime = context.baseTime();
+            var fromTime = context.fromTime();
+            var toTime = context.toTime();
+
+            Payment payment1 = createPayment("corr-1", RemotePaymentName.DEFAULT, BigDecimal.ZERO, baseTime);
+            Payment payment2 = createPayment("corr-2", RemotePaymentName.FALLBACK, BigDecimal.ZERO, baseTime);
+
+            payments.add(payment1);
+            payments.add(payment2);
+
+            PaymentsSummary summary = payments.getSummary(fromTime, toTime);
+            assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(1L);
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.ZERO);
+            assertThat(summary.fallbackPaymentSummary().totalRequests()).isEqualTo(1L);
+            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.ZERO);
+        }
+
+        @Test
+        @DisplayName("Should handle null payment reference")
+        default void shouldHandleNullPaymentReference() {
+            var context = testContext();
+            var payments = context.payments();
+            var baseTime = context.baseTime();
+            var fromTime = context.fromTime();
+            var toTime = context.toTime();
+
+            Payment payment1 = createPayment("corr-1", RemotePaymentName.DEFAULT, BigDecimal.valueOf(50.00), baseTime);
+            Payment payment2 = createPayment("corr-2", RemotePaymentName.FALLBACK, BigDecimal.valueOf(60.00), baseTime);
+
+            payments.add(payment1);
+            payments.add(payment2);
+            payments.add(null);
+
+            PaymentsSummary summary = payments.getSummary(fromTime, toTime);
+            assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(1L);
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(50.00));
+            assertThat(summary.fallbackPaymentSummary().totalRequests()).isEqualTo(1L);
+            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(60.00));
         }
     }
 
@@ -213,7 +258,7 @@ public interface PaymentsTests {
 
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(1L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(50.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(50.00));
         }
     }
 
@@ -249,7 +294,7 @@ public interface PaymentsTests {
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
 
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(1L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(150.75).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(150.75));
         }
 
         @Test
@@ -272,7 +317,7 @@ public interface PaymentsTests {
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
 
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(1L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(200.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(200.00));
         }
 
         @Test
@@ -292,7 +337,7 @@ public interface PaymentsTests {
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
 
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(2L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(300.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(300.00));
         }
 
         @Test
@@ -317,10 +362,10 @@ public interface PaymentsTests {
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
 
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(2L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(250.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(250.00));
 
             assertThat(summary.fallbackPaymentSummary().totalRequests()).isEqualTo(2L);
-            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(450.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(450.00));
         }
 
         @Test
@@ -341,9 +386,77 @@ public interface PaymentsTests {
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
 
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(2L);
-            // 10.55 + 20.44 = 30.99
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(30.99).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(10.555).add(BigDecimal.valueOf(20.444)));
         }
+
+        @Test
+        @DisplayName("Should handle empty summary correctly")
+        default void shouldHandleEmptySummaryCorrectly() {
+            var context = testContext();
+            var payments = context.payments();
+            var fromTime = context.fromTime();
+            var toTime = context.toTime();
+
+            PaymentsSummary summary = payments.getSummary(fromTime, toTime);
+
+            assertThat(summary.defaultPaymentSummary().totalRequests()).isZero();
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.ZERO);
+            assertThat(summary.fallbackPaymentSummary().totalRequests()).isZero();
+            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.ZERO);
+        }
+
+        @Test
+        @DisplayName("Should handle summary with no payments in period")
+        default void shouldHandleSummaryWithNoPaymentsInPeriod() {
+            var context = testContext();
+            var payments = context.payments();
+            var baseTime = context.baseTime();
+            var fromTime = context.fromTime();
+            var toTime = context.toTime();
+
+            // Create a payment outside the period
+            Payment paymentOutsidePeriod = createPayment("corr-1", RemotePaymentName.DEFAULT, BigDecimal.valueOf(50.75), baseTime.minus(2, ChronoUnit.HOURS));
+            payments.add(paymentOutsidePeriod);
+
+            PaymentsSummary summary = payments.getSummary(fromTime, toTime);
+
+            assertThat(summary.defaultPaymentSummary().totalRequests()).isZero();
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.ZERO);
+            assertThat(summary.fallbackPaymentSummary().totalRequests()).isZero();
+            assertThat(summary.fallbackPaymentSummary().totalAmount()).isEqualTo(BigDecimal.ZERO);
+        }
+
+        @ParameterizedTest
+        @ValueSource(ints = {0, 1, 100, 1000, 10000, 100000, 1000000, 10000000})
+        @DisplayName("Should handle large number of payments")
+        default void shouldHandleLargeNumberOfPayments(int paymentCount) {
+            var context = testContext();
+            var payments = context.payments();
+            var baseTime = context.baseTime();
+            var fromTime = context.fromTime();
+            var toTime = context.toTime();
+
+            BigDecimal paymentAmount = BigDecimal.valueOf(10.00);
+
+            // Add a large number of payments
+            IntStream.range(0, paymentCount)
+                    .forEach(i -> {
+                        Payment payment = createPayment("corr-" + i, RemotePaymentName.DEFAULT, paymentAmount, baseTime);
+                        payments.add(payment);
+                    });
+
+            // get the duration of the operation
+            Instant start = Instant.now();
+            PaymentsSummary summary = payments.getSummary(fromTime, toTime);
+            Duration duration = Duration.between(start, Instant.now());
+            System.out.println("Time taken to get summary for " + paymentCount + " payments: " + duration.toMillis() + " ms");
+
+            if (paymentCount > 0) {
+                assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(paymentCount);
+                assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(paymentAmount.multiply(BigDecimal.valueOf(paymentCount)));
+            }
+        }
+
     }
 
     @DisplayName("Concurrency Tests")
@@ -375,7 +488,7 @@ public interface PaymentsTests {
 
             PaymentsSummary summary = payments.getSummary(fromTime, toTime);
             assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(100L);
-            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(1000.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(1000.00));
 
             executor.shutdown();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
@@ -413,7 +526,7 @@ public interface PaymentsTests {
             // All summaries should be consistent
             assertThat(summaries).allSatisfy(summary -> {
                 assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(50L);
-                assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(500.00).setScale(2, RoundingMode.HALF_DOWN));
+                assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(500.00));
             });
 
             executor.shutdown();
@@ -486,7 +599,7 @@ public interface PaymentsTests {
             // Get updated summary
             PaymentsSummary summary2 = payments.getSummary(fromTime, toTime);
             assertThat(summary2.defaultPaymentSummary().totalRequests()).isEqualTo(2L);
-            assertThat(summary2.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(150.00).setScale(2, RoundingMode.HALF_DOWN));
+            assertThat(summary2.defaultPaymentSummary().totalAmount()).isEqualTo(BigDecimal.valueOf(150.00));
 
             // Purge and verify
             payments.purge();
@@ -517,7 +630,7 @@ public interface PaymentsTests {
             if (paymentCount > 0) {
                 assertThat(summary.defaultPaymentSummary().totalRequests()).isEqualTo(paymentCount);
                 BigDecimal expectedAmount = paymentAmount.multiply(BigDecimal.valueOf(paymentCount));
-                assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(expectedAmount.setScale(2, RoundingMode.HALF_DOWN));
+                assertThat(summary.defaultPaymentSummary().totalAmount()).isEqualTo(expectedAmount);
             } else {
                 assertThat(summary.defaultPaymentSummary().totalRequests()).isZero();
                 assertThat(summary.fallbackPaymentSummary().totalRequests()).isZero();

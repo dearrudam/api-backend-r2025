@@ -11,7 +11,7 @@ class InMemoryPaymentsTests implements PaymentsTests.AllTests {
 
     @BeforeEach
     void setUp() {
-        payments = new InMemoryPayments();
+        payments = new InMemoryPayments(InMemoryPayments.DEFAULT_PARALLEL_STREAM_THRESHOLD);
     }
 
     @Override
