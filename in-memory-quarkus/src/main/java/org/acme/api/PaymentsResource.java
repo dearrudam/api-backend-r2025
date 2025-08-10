@@ -1,7 +1,8 @@
 package org.acme.api;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import io.smallrye.common.annotation.RunOnVirtualThread;
+import jakarta.json.bind.annotation.JsonbCreator;
+import jakarta.json.bind.annotation.JsonbProperty;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -25,12 +26,20 @@ public class PaymentsResource {
         this.paymentWorker = paymentWorker;
     }
 
-    record PaymentRequest(String correlationId,
-                          @JsonFormat(shape = JsonFormat.Shape.NUMBER)
-                          BigDecimal amount) {
+    public record PaymentRequest(
+            String correlationId,
+            BigDecimal amount) {
         public NewPaymentRequest toNewPayment() {
             return new NewPaymentRequest(correlationId(), amount());
         }
+
+        @JsonbCreator
+        public static PaymentRequest of(
+                @JsonbProperty("correlationId") String correlationId,
+                @JsonbProperty("amount") BigDecimal amount) {
+            return new PaymentRequest(correlationId, amount);
+        }
+
     }
 
     @POST

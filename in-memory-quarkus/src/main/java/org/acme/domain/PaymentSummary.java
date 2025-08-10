@@ -1,17 +1,13 @@
 package org.acme.domain;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
+import io.quarkus.runtime.annotations.RegisterForReflection;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.Collection;
-import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+@RegisterForReflection
 public record PaymentSummary(Long totalRequests,
-                             @JsonFormat(shape = JsonFormat.Shape.NUMBER)
                              BigDecimal totalAmount) {
     public static PaymentSummary ZERO = new PaymentSummary(0L, BigDecimal.ZERO);
 
@@ -20,7 +16,7 @@ public record PaymentSummary(Long totalRequests,
         if (totalRequests < 0) {
             throw new IllegalArgumentException("Total requests must be non-negative");
         }
-        totalAmount = totalAmount.setScale(2, RoundingMode.HALF_DOWN);
+        totalAmount = totalAmount == null ? BigDecimal.ZERO : totalAmount;
     }
 
     public static PaymentSummary of(Long totalRequests, BigDecimal totalAmount) {
@@ -40,30 +36,17 @@ public record PaymentSummary(Long totalRequests,
         if (payment == null) {
             return this;
         }
-        return addAll(List.of(payment));
+        return new PaymentSummary(totalRequests + 1, totalAmount.add(payment.amount()));
     }
 
     public PaymentSummary add(PaymentSummary paymentSummary) {
         if (paymentSummary == null) {
             return this;
         }
-        var newTotalRequests = this.totalRequests + paymentSummary.totalRequests;
-        BigDecimal newTotalAmount = this.totalAmount.add(paymentSummary.totalAmount);
-        return PaymentSummary.of(newTotalRequests, newTotalAmount);
-    }
-
-    public PaymentSummary addAll(Collection<Payment> payments) {
-        if (payments == null) {
-            return this;
-        }
-        var totalRequests = new AtomicLong(this.totalRequests);
-        var totalAmount = payments.stream()
-                .parallel()
-                .filter(Objects::nonNull)
-                .peek(p -> totalRequests.incrementAndGet())
-                .map(Payment::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add, BigDecimal::add);
-        return PaymentSummary.of(totalRequests.get(), this.totalAmount.add(totalAmount));
+        return PaymentSummary.of(
+                this.totalRequests + paymentSummary.totalRequests(),
+                this.totalAmount.add(paymentSummary.totalAmount())
+        );
     }
 
 }

@@ -1,13 +1,15 @@
 package org.acme.domain;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.runtime.annotations.RegisterForReflection;
+import jakarta.json.bind.annotation.JsonbProperty;
 
 import java.util.Map;
 import java.util.Optional;
 
+@RegisterForReflection
 public record PaymentsSummary(
-        @JsonProperty("default") PaymentSummary defaultPaymentSummary,
-        @JsonProperty("fallback") PaymentSummary fallbackPaymentSummary) {
+        @JsonbProperty("default") PaymentSummary defaultPaymentSummary,
+        @JsonbProperty("fallback") PaymentSummary fallbackPaymentSummary) {
 
     public static final PaymentsSummary ZERO = new PaymentsSummary(PaymentSummary.ZERO, PaymentSummary.ZERO);
 
