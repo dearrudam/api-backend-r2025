@@ -1,0 +1,2 @@
+# Enabling CORS for Payara Micro applications
+set-openapi-configuration --corsheaders=true

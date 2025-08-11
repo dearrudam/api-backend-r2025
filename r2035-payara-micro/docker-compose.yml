@@ -1,0 +1,53 @@
+services:
+  #--- BACKEND 1 ---
+  backend-01: &backend
+    image: r2035-payara-micro:0.1-SNAPSHOT
+    environment:
+      - JEDIS_URL=redis://redis:6379
+      - DEFAULT_PAYMENT_URL=http://payment-processor-default:8080/payments
+      - FALLBACK_PAYMENT_URL=http://payment-processor-fallback:8080/payments
+      - RETRIES_BEFORE_FALLBACK=10000
+      - INSTANCE_ID=backend-01
+      - WORKERS_SIZE=5
+      - MEM_MAX_RAM_PERCENTAGE=100.0
+      - JVM_ARGS=-Djdk.util.zip.disableZip64ExtraFieldValidation=true -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - "9999:8080"
+      - "5005:5005"
+    networks:
+      - payara-backend-net
+      - payment-processor
+    hostname:  r2035-payara-micro-01
+    deploy:
+      resources:
+        limits:
+          cpus: "0.46"
+          memory: "2GB"
+
+  #--- BACKEND 2 ---
+
+  #--- QUEUE AND STORAGE ---
+  redis:
+    image: redis:7.2-alpine
+    container_name: r2025-payara-micro-redis
+    command: redis-server --save "" --appendonly no --maxclients 20000
+    ports:
+      - "6377:6379"
+    networks:
+      - payara-backend-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "212MB"
+#--- NETWORKS ---
+networks:
+  payara-backend-net:
+    driver: bridge
+  payment-processor:
+    external: true
