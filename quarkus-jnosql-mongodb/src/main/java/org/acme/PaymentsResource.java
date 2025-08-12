@@ -1,5 +1,6 @@
 package org.acme;
 
+import io.smallrye.common.annotation.Blocking;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
@@ -14,7 +15,6 @@ import jakarta.ws.rs.core.Response;
 import java.time.Instant;
 
 @Path("/")
-@RunOnVirtualThread
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class PaymentsResource {
@@ -33,7 +33,6 @@ public class PaymentsResource {
     }
 
     @POST
-    @RunOnVirtualThread
     @Path("/payments")
     public Response processPayment(PaymentRequest paymentRequest) {
         paymentProcessor.acceptPayment(paymentRequest);
@@ -41,7 +40,7 @@ public class PaymentsResource {
     }
 
     @GET
-    @RunOnVirtualThread
+    @Blocking
     @Path("/payments-summary")
     public Object getPaymentsSummary(
             @QueryParam("from") Instant from,
@@ -51,7 +50,7 @@ public class PaymentsResource {
     }
 
     @POST
-    @RunOnVirtualThread
+    @Blocking
     @Path("/purge-payments")
     public void purge() {
         paymentsRepository.deleteAll();
