@@ -1,7 +1,6 @@
 package org.acme.payments.infrastructure;
 
 import io.quarkus.runtime.Startup;
-import io.quarkus.virtual.threads.VirtualThreads;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -32,18 +31,19 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class JedisPayments implements PaymentsProcessor, PaymentsRepository {
 
-    public static final String PAYMENTS_PROCESSED = "payments-processed";
+    public static final String PAYMENTS = "payments";
+    public static final String PAYMENTS_QUEUE = "payments-queued";
 
     @Inject
     @ConfigProperty(name = "jedis.url", defaultValue = "redis://localhost:6377")
     private String jedisUrl;
 
     @Inject
-    @ConfigProperty(name = "instanceId", defaultValue = "instance-01")
-    private String instanceId;
+    @ConfigProperty(name = "instance.name", defaultValue = "singleInstance")
+    private String instanceName;
 
     @Inject
-    @ConfigProperty(name = "workers.size", defaultValue = "20")
+    @ConfigProperty(name = "workers.size", defaultValue = "1")
     private int workersSize;
 
     @Inject
@@ -56,43 +56,15 @@ public class JedisPayments implements PaymentsProcessor, PaymentsRepository {
     private UnifiedJedis summaryJedis;
 
     private Jsonb jsonb;
-    private String queueName;
 
     private LinkedBlockingQueue<PaymentRequest> queue = new LinkedBlockingQueue<>();
 
-    @Startup
-    public void onApplicationStart() {
-        for (int i = 0; i < workersSize; i++) {
-            executeService.execute(() -> this.listenForPayments(createUnifiedJedis()));
-            System.out.printf("Started worker %d for instance %s%n", i, instanceId);
-        }
-        this.executeService.execute(() -> {
-            UnifiedJedis unifiedJedis = createUnifiedJedis();
-            while (true) {
-                try {
-                    PaymentRequest paymentRequest = queue.take();
-                    queueInRedis(unifiedJedis, paymentRequest);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt(); // Restore interrupted status
-                    break; // Exit the loop if interrupted
-                }
-            }
-        });
-        System.out.println("Started worker for queue processing");
-
-    }
-
     @PostConstruct
     public void postConstruct() {
-        this.queueName = "payments-queue-" + instanceId;
         this.jsonb = JsonbBuilder.create();
         this.purgeJedis = createUnifiedJedis();
         this.summaryJedis = createUnifiedJedis();
         this.executeService = Executors.newVirtualThreadPerTaskExecutor();
-    }
-
-    private UnifiedJedis createUnifiedJedis() {
-        return new UnifiedJedis(jedisUrl);
     }
 
     @PreDestroy
@@ -113,33 +85,66 @@ public class JedisPayments implements PaymentsProcessor, PaymentsRepository {
         }
     }
 
+    @Startup
+    public void onApplicationStart() {
+
+        // Initialize the queue in Redis
+        int initiatedWorker = 0;
+        do {
+            executeService.execute(() -> this.listenForPayments(createUnifiedJedis()));
+            initiatedWorker++;
+        } while (initiatedWorker < this.workersSize);
+        System.out.printf("Started %d workers for queue payment processing%n", initiatedWorker);
+
+        // Start a separate thread to handle queuing payment requests to Redis
+        // This thread will take payment requests from the queue and push them to Redis
+        this.executeService.execute(() -> {
+            UnifiedJedis unifiedJedis = createUnifiedJedis();
+            while (true) {
+                try {
+                    PaymentRequest paymentRequest = queue.take();
+                    queueInRedis(unifiedJedis, paymentRequest);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt(); // Restore interrupted status
+                    break; // Exit the loop if interrupted
+                }
+            }
+        });
+
+    }
+
+    private UnifiedJedis createUnifiedJedis() {
+        return new UnifiedJedis(jedisUrl);
+    }
+
     private void listenForPayments(UnifiedJedis unifiedJedis) {
         while (!executeService.isShutdown()) {
             try {
-                Optional<PaymentRequest> receivedPaymentRequest = Optional.empty();
-                // BLPOP returns a list of two elements: the queue name and the message
-                var result = unifiedJedis.blpop(0, queueName);
-                if (result != null && result.size() == 2) {
-                    String message = result.get(1);
-                    receivedPaymentRequest = Optional.ofNullable(jsonb.fromJson(message, PaymentRequest.class));
-                }
-
+                Optional<PaymentRequest> receivedPaymentRequest = retrievePaymentRequest(unifiedJedis);
+                // Process the payment request if it was received
                 receivedPaymentRequest.ifPresent(paymentRequest ->
                         externalPaymentProcessor.process(paymentRequest)
                                 .ifPresentOrElse(
-                                        processedPayment ->
-                                                unifiedJedis.lpush(PAYMENTS_PROCESSED, jsonb.toJson(processedPayment)),
-                                        () -> {
-                                            // If processing fails, re-queue the payment request
-                                            queue.offer(paymentRequest);
-                                        }));
+                                        processedPayment -> unifiedJedis.lpush(PAYMENTS, jsonb.toJson(processedPayment)),
+                                        () -> queue(paymentRequest) // If processing fails, re-queue the payment request
+                                ));
             } catch (RuntimeException e) {
-                // Log the exception or handle it as needed
                 if (e instanceof JedisException) {
+                    // printing any Jedis exception stack trace
                     e.printStackTrace();
                 }
             }
         }
+    }
+
+    private Optional<PaymentRequest> retrievePaymentRequest(UnifiedJedis unifiedJedis) {
+        // BLPOP returns a list of two elements: the queue name and the message
+        var result = unifiedJedis.blpop(0, PAYMENTS_QUEUE); // 0 timeout means to block indefinitely
+        if (result != null && result.size() == 2) {
+            String message = result.get(1);
+            return Optional.ofNullable(jsonb.fromJson(message, PaymentRequest.class));
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -148,17 +153,17 @@ public class JedisPayments implements PaymentsProcessor, PaymentsRepository {
     }
 
     private void queueInRedis(UnifiedJedis unifiedJedis, PaymentRequest paymentRequest) {
-        unifiedJedis.lpush(queueName, jsonb.toJson(paymentRequest));
+        unifiedJedis.lpush(PAYMENTS_QUEUE, jsonb.toJson(paymentRequest));
     }
 
     @Override
     public void purge() {
-        this.purgeJedis.del(PAYMENTS_PROCESSED);
+        this.purgeJedis.del(PAYMENTS);
     }
 
     @Override
     public PaymentsSummary summary(Instant from, Instant to) {
-        Map<String, PaymentSummary> summary = summaryJedis.lrange(PAYMENTS_PROCESSED, 0, -1)
+        Map<String, PaymentSummary> summary = summaryJedis.lrange(PAYMENTS, 0, -1)
                 .stream()
                 .map(json -> jsonb.fromJson(json, ProcessedPayment.class))
                 .filter(createdOn(from, to))
