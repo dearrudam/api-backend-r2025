@@ -28,11 +28,8 @@ services:
       - DEFAULT_PAYMENT_URL=http://payment-processor-default:8080/payments
       - FALLBACK_PAYMENT_URL=http://payment-processor-fallback:8080/payments
       - RETRIES_BEFORE_FALLBACK=10000
-      - INSTANCE_ID=backend-01
-      - WORKERS_SIZE=13
-      - JVM_ARGS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-    ports:
-      - "5008:5005"
+      - INSTANCE_NAME=backend-01
+      - WORKERS_SIZE=11
     networks:
       - quarkus-with-jedis-net
       - payment-processor
@@ -42,7 +39,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.50"
+          cpus: "0.40"
           memory: "65MB"
 
   #--- BACKEND 2 ---
@@ -55,11 +52,8 @@ services:
       - DEFAULT_PAYMENT_URL=http://payment-processor-default:8080/payments
       - FALLBACK_PAYMENT_URL=http://payment-processor-fallback:8080/payments
       - RETRIES_BEFORE_FALLBACK=10000
-      - INSTANCE_ID=backend-02
-      - WORKERS_SIZE=13
-      - JVM_ARGS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
-    ports:
-      - "5009:5005"
+      - INSTANCE_NAME=backend-02
+      - WORKERS_SIZE=11
 
   #--- QUEUE AND STORAGE ---
   redis:
@@ -78,7 +72,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.30"
+          cpus: "0.50"
           memory: "200MB"
 #--- NETWORKS ---
 networks:
